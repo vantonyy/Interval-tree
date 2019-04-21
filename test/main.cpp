@@ -19,4 +19,5 @@ int main()
 	if (const Interval* i = t.searchOverlap(Interval(4, 9))) {
 		std::cout << "[4, 9] overlapped " << "[" << i->getLow() << ", " << i->getHigh() << "]\n";
 	}
+	std::cout << t.search(Interval(4, 9)) << " " << t.search(Interval(8, 9)) << "\n";
 }
