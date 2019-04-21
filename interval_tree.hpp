@@ -45,6 +45,11 @@ public:
 		       (m_high >= i.m_low && m_high >= i.m_high);
 	}
 
+	bool isEqual(const Interval& i) const
+	{
+		return m_low == i.m_low && m_high == i.m_high;
+	}
+
 	int getLow() const
 	{
 		return m_low;
@@ -123,27 +128,67 @@ public:
 		}
 	}
 
-	const Interval* searchOverlap(Interval i) const
+	const Interval* searchOverlap(const Interval& i) const
 	{
-		if (const IntervalNode* found = searchOverlapHelper(m_root, i)) {
+		auto pred = [](const Interval& i1, const Interval& i2) {
+			return i1.isOverlap(i2);
+		};
+		if (const IntervalNode* found = searchNode(m_root, i, pred)) {
 			return &(found->m_interval);
 		}
 		return 0;
 	}
-private:
 
-	static IntervalNode* searchOverlapHelper(IntervalNode* root, Interval i)
+	void remove(const Interval& i)
+	{
+		removeHelper(m_root, i);
+	}
+
+	bool search(const Interval& i)
+	{
+		auto pred = [](const Interval& i1, const Interval& i2) { 
+			return i1.isEqual(i2); 
+		};
+		return 0 != searchNode(m_root, i, pred);
+	}
+private:
+	//Helper functions
+	static IntervalNode* max(IntervalNode* root)
 	{
 		if (0 == root) {
 			return 0;
 		}
-		if (i.isOverlap(root->m_interval)) {
-			return root;
+		while (0 != root->m_right) {
+			root = root->m_right;
 		}
-		if (root->m_interval.getLow() < i.getLow()) {
-			return searchOverlapHelper(root->m_right, i);
+		return root;
+	}
+
+	static IntervalNode* maxRecursive(IntervalNode* root)
+	{
+		if (0 == root) {
+			return 0;
 		}
-		return searchOverlapHelper(root->m_left, i);
+		return 0 == root->m_right ? root : maxRecursive(root->m_right);
+	}
+
+	static IntervalNode* min(IntervalNode* root)
+	{
+		if (0 == root) {
+			return 0;
+		}
+		while (0 != root->m_left) {
+			root = root->m_left;
+		}
+		return root;
+	}
+
+	static IntervalNode* minRecursive(IntervalNode* root)
+	{
+		if (0 == root) {
+			return 0;
+		}
+		return 0 == root->m_left ? root : minRecursive(root->m_left);
 	}
 
 	static void printHelper(const IntervalNode* root)
@@ -161,6 +206,27 @@ private:
 			std::cout << "[" << root->m_interval.getLow() << ", "
 				<< root->m_interval.getHigh() << "] - " << root->m_max_high << "\n";
 		}
+	}
+
+	static void removeHelper(IntervalNode*& root, const Interval& i)
+	{
+		//TODO: implement
+	}
+
+	//Helper functions
+	template <typename Predicate>
+	static IntervalNode* searchNode(IntervalNode* root, const Interval& i, const Predicate& pred)
+	{
+		if (0 == root) {
+			return 0;
+		}
+		if (pred(root->m_interval, i)) {
+			return root;
+		}
+		if (root->m_interval.getLow() < i.getLow()) {
+			return searchNode(root->m_right, i, pred);
+		}
+		return searchNode(root->m_left, i, pred);
 	}
 
 	static void insertHelper(IntervalNode*& root, const Interval& i)
