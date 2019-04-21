@@ -83,6 +83,11 @@ public:
 		delete m_left;
 		delete m_right;
 	}
+
+	const Interval& getInterval() const
+	{
+		return m_interval;
+	}
 private:
 	IntervalNode* m_left;
 	IntervalNode* m_right;
@@ -139,7 +144,12 @@ public:
 	const bool collectOverlaps(const Interval& i, std::list<const Interval*>& overlaps) const
 	{
 		overlaps.clear();
-		collectOverlaps(m_root, i, overlaps);
+		preorderTraversal(m_root, [&](const IntervalNode* n) {
+			const Interval& nodeInterval = n->getInterval();
+			if (i.isOverlap(nodeInterval)) {
+				overlaps.push_back(&nodeInterval);
+			}
+		});
 		return !overlaps.empty();
 	}
 
@@ -271,16 +281,15 @@ private:
 		return searchOverlap(root->m_right, i);
 	}
 
-	static void collectOverlaps(const IntervalNode* root, const Interval& i, std::list<const Interval*>& overlaps)
+	template <typename Visitor>
+	static void preorderTraversal(const IntervalNode* root, const Visitor& visit)
 	{
 		if (0 == root) {
 			return;
 		}
-		if (i.isOverlap(root->m_interval)) {
-			overlaps.push_back(&root->m_interval);
-		}
-		collectOverlaps(root->m_left, i, overlaps);
-		collectOverlaps(root->m_right, i, overlaps);
+		visit(root);
+		preorderTraversal(root->m_left, visit);
+		preorderTraversal(root->m_right, visit);
 	}
 
 	static void insertHelper(IntervalNode*& root, const Interval& i)
