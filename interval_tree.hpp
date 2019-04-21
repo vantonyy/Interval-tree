@@ -6,7 +6,7 @@
 #include <list>
 #include <exception>
 
-class InvalidInterval 
+class InvalidInterval
 	: public std::exception
 {
 public:
@@ -38,11 +38,14 @@ public:
 		m_low = low;
 		m_high = high;
 	}
-
+	
+	/// l		  h
+	//  |-------------|
+	//    |------------------------|
+	///   l			       h
 	bool isOverlap(const Interval& i) const
 	{
-		return (m_low >= i.m_low && m_low >= i.m_high) ||
-		       (m_high >= i.m_low && m_high >= i.m_high);
+		return m_low <= i.m_high && i.m_low <= m_high;
 	}
 
 	bool isEqual(const Interval& i) const
@@ -96,7 +99,7 @@ public:
 	IntervalTree()
 		: m_root(0)
 	{}
-	
+
 	~IntervalTree()
 	{
 		delete m_root;
@@ -130,25 +133,13 @@ public:
 
 	const Interval* searchOverlap(const Interval& i) const
 	{
-		auto pred = [](const Interval& i1, const Interval& i2) {
-			return i1.isOverlap(i2);
-		};
-		if (const IntervalNode* found = searchNode(m_root, i, pred)) {
-			return &(found->m_interval);
-		}
-		return 0;
+		return searchOverlap(m_root, i);
 	}
 
 	const bool collectOverlaps(const Interval& i, std::list<const Interval*>& overlaps) const
 	{
-		auto pred = [&](const Interval& i1, const Interval& i2) {
-			if (i1.isOverlap(i2)) {
-				overlaps.push_back(&i1);
-			}
-			return false;
-		};
 		overlaps.clear();
-		searchNode(m_root, i, pred);
+		collectOverlaps(m_root, i, overlaps);
 		return !overlaps.empty();
 	}
 
@@ -159,10 +150,7 @@ public:
 
 	bool search(const Interval& i)
 	{
-		auto pred = [](const Interval& i1, const Interval& i2) { 
-			return i1.isEqual(i2); 
-		};
-		return 0 != searchNode(m_root, i, pred);
+		return 0 != searchNode(m_root, i);
 	}
 private:
 	//Helper functions
@@ -231,43 +219,68 @@ private:
 				IntervalNode* newRoot = root->m_right;
 				root->m_right = 0;
 				delete root;
-root = newRoot;
+				root = newRoot;
 			}
- else if (0 == root->m_right) {
-	 IntervalNode* newRoot = root->m_left;
-	 root->m_left = 0;
-	 delete root;
-	 root = newRoot;
- }
- else {
-	 IntervalNode* minNode = min(root->m_right);
-	 root->m_interval = minNode->m_interval;
-	 removeHelper(root->m_right, minNode->m_interval);
-	 updateMaxHigh(root);
- }
+			else if (0 == root->m_right) {
+				IntervalNode* newRoot = root->m_left;
+				root->m_left = 0;
+				delete root;
+				root = newRoot;
+			}
+			else {
+				IntervalNode* minNode = min(root->m_right);
+				root->m_interval = minNode->m_interval;
+				removeHelper(root->m_right, minNode->m_interval);
+				updateMaxHigh(root);
+			}
 		}
- else if (root->m_interval.getLow() < i.getLow()) {
-	 removeHelper(root->m_right, i);
- }
- else {
-	 removeHelper(root->m_left, i);
- }
- adjustTree(root);
+		else if (root->m_interval.getLow() < i.getLow()) {
+			removeHelper(root->m_right, i);
+		}
+		else {
+			removeHelper(root->m_left, i);
+		}
+		adjustTree(root);
 	}
 
-	template <typename Predicate>
-	static IntervalNode*& searchNode(IntervalNode* root, const Interval& i, const Predicate& pred)
+	static IntervalNode*& searchNode(IntervalNode* root, const Interval& i)
 	{
 		if (0 == root) {
 			return root;
 		}
-		if (pred(root->m_interval, i)) {
+		if (i.isEqual(root->m_interval)) {
 			return root;
 		}
 		if (root->m_interval.getLow() < i.getLow()) {
-			return searchNode(root->m_right, i, pred);
+			return searchNode(root->m_right, i);
 		}
-		return searchNode(root->m_left, i, pred);
+		return searchNode(root->m_left, i);
+	}
+
+	static const Interval* searchOverlap(const IntervalNode* root, const Interval& i)
+	{
+		if (0 == root) {
+			return 0;
+		}
+		if (i.isOverlap(root->m_interval)) {
+			return &root->m_interval;
+		}
+		if (0 != root->m_left && root->m_left->m_max_high >= i.getLow()) {
+			return searchOverlap(root->m_left, i);
+		}
+		return searchOverlap(root->m_right, i);
+	}
+
+	static void collectOverlaps(const IntervalNode* root, const Interval& i, std::list<const Interval*>& overlaps)
+	{
+		if (0 == root) {
+			return;
+		}
+		if (i.isOverlap(root->m_interval)) {
+			overlaps.push_back(&root->m_interval);
+		}
+		collectOverlaps(root->m_left, i, overlaps);
+		collectOverlaps(root->m_right, i, overlaps);
 	}
 
 	static void insertHelper(IntervalNode*& root, const Interval& i)
@@ -280,7 +293,8 @@ root = newRoot;
 		}
 		else if (root->m_interval.getLow() > i.getLow()) {
 			insertHelper(root->m_left, i);
-		} else {
+		}
+		else {
 			return;
 		}
 		adjustTree(root);
@@ -329,7 +343,8 @@ root = newRoot;
 		}
 		if (0 == root->m_left && 0 == root->m_right) {
 			root->m_max_high = root->m_interval.getHigh();
-		} else {
+		}
+		else {
 			updateMaxHigh(root->m_left);
 			updateMaxHigh(root->m_right);
 			//update max high
@@ -345,7 +360,7 @@ root = newRoot;
 		int bfactor = getBlanaceFactor(root);
 		if (bfactor == -2) {
 			if (getBlanaceFactor(root->m_right) == 1) {
-				root->m_right = RightRotate(root->m_right);
+				root->m_right = rightRotate(root->m_right);
 			}
 			return leftRotate(root);
 		}
@@ -353,7 +368,7 @@ root = newRoot;
 			if (getBlanaceFactor(root->m_left) == -1) {
 				root->m_left = leftRotate(root->m_left);
 			}
-			return RightRotate(root);
+			return rightRotate(root);
 		}
 		return root;
 	}
@@ -372,7 +387,7 @@ root = newRoot;
 		return 0;
 	}
 
-	static IntervalNode* RightRotate(IntervalNode* root)
+	static IntervalNode* rightRotate(IntervalNode* root)
 	{
 		if (0 != root) {
 			IntervalNode* newRoot = root->m_left;
