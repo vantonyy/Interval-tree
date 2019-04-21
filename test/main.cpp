@@ -15,6 +15,14 @@ int main()
 	t.insert(Interval(15, 23));
 	t.printInorder();
 	t.printLevelorder();
+	std::list<const Interval*> overlaps;
+	t.collectOverlaps(Interval(2, 17), overlaps);
+	std::cout << "\n[2, 17] overlaps:\n";
+	for (const Interval* i : overlaps) {
+		std::cout << "[" << i->getLow() << ", " << i->getHigh() << "]\n";
+	}
+	std::cout << "\n";
+
 	if (const Interval* i = t.searchOverlap(Interval(4, 9))) {
 		std::cout << "[4, 9] overlapped " << "[" << i->getLow() << ", " << i->getHigh() << "]\n";
 	}
