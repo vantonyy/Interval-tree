@@ -139,6 +139,19 @@ public:
 		return 0;
 	}
 
+	const bool collectOverlaps(const Interval& i, std::list<const Interval*>& overlaps) const
+	{
+		auto pred = [&](const Interval& i1, const Interval& i2) {
+			if (i1.isOverlap(i2)) {
+				overlaps.push_back(&i1);
+			}
+			return false;
+		};
+		overlaps.clear();
+		searchNode(m_root, i, pred);
+		return !overlaps.empty();
+	}
+
 	void remove(const Interval& i)
 	{
 		removeHelper(m_root, i);
@@ -210,15 +223,43 @@ private:
 
 	static void removeHelper(IntervalNode*& root, const Interval& i)
 	{
-		//TODO: implement
+		if (0 == root) {
+			return;
+		}
+		if (root->m_interval.isEqual(i)) {
+			if (0 == root->m_left) {
+				IntervalNode* newRoot = root->m_right;
+				root->m_right = 0;
+				delete root;
+root = newRoot;
+			}
+ else if (0 == root->m_right) {
+	 IntervalNode* newRoot = root->m_left;
+	 root->m_left = 0;
+	 delete root;
+	 root = newRoot;
+ }
+ else {
+	 IntervalNode* minNode = min(root->m_right);
+	 root->m_interval = minNode->m_interval;
+	 removeHelper(root->m_right, minNode->m_interval);
+	 updateMaxHigh(root);
+ }
+		}
+ else if (root->m_interval.getLow() < i.getLow()) {
+	 removeHelper(root->m_right, i);
+ }
+ else {
+	 removeHelper(root->m_left, i);
+ }
+ adjustTree(root);
 	}
 
-	//Helper functions
 	template <typename Predicate>
-	static IntervalNode* searchNode(IntervalNode* root, const Interval& i, const Predicate& pred)
+	static IntervalNode*& searchNode(IntervalNode* root, const Interval& i, const Predicate& pred)
 	{
 		if (0 == root) {
-			return 0;
+			return root;
 		}
 		if (pred(root->m_interval, i)) {
 			return root;
@@ -233,33 +274,69 @@ private:
 	{
 		if (0 == root) {
 			root = new IntervalNode(i);
-		} else if (root->m_interval.getLow() < i.getLow()) {
+		}
+		else if (root->m_interval.getLow() < i.getLow()) {
 			insertHelper(root->m_right, i);
-		} else if (root->m_interval.getLow() > i.getLow()) {
+		}
+		else if (root->m_interval.getLow() > i.getLow()) {
 			insertHelper(root->m_left, i);
 		} else {
 			return;
 		}
-		//update root balance factor
-		updateHeight(root);
-		//update balance of the tree
-		root = rebalance(root);
+		adjustTree(root);
 		//update max high
-		updateMaxHigh(root, i);
+		updateMaxHigh(root, i.getHigh());
 	}
 
-	static void updateMaxHigh(IntervalNode* root, const Interval& i)
+	static void updateMaxHigh(IntervalNode* root, int maxHigh)
 	{
-		if (root->m_max_high < i.getHigh()) {
-			root->m_max_high = i.getHigh();
+		if (root->m_max_high < maxHigh) {
+			root->m_max_high = maxHigh;
 		}
+	}
+
+	static int getMaxInterval(const IntervalNode* l, const IntervalNode* r)
+	{
+		if (0 == r) {
+			return 0 == l ? 0 : l->m_max_high;
+		}
+		if (0 == l) {
+			return 0 == r ? 0 : r->m_max_high;
+		}
+		return l->m_max_high > r->m_max_high ? l->m_max_high : r->m_max_high;
 	}
 
 	static void updateHeight(IntervalNode* root)
 	{
 		if (0 != root) {
 			root->m_height = 1 + std::max(getHeight(root->m_left),
-						      getHeight(root->m_right));
+				getHeight(root->m_right));
+		}
+	}
+
+	static void adjustTree(IntervalNode*& root)
+	{
+		//update root balance factor
+		updateHeight(root);
+		//update balance of the tree
+		root = rebalance(root);
+	}
+
+	static void updateMaxHigh(IntervalNode* root)
+	{
+		if (0 == root) {
+			return;
+		}
+		if (0 == root->m_left && 0 == root->m_right) {
+			root->m_max_high = root->m_interval.getHigh();
+		} else {
+			updateMaxHigh(root->m_left);
+			updateMaxHigh(root->m_right);
+			//update max high
+			int max = getMaxInterval(root->m_left, root->m_right);
+			if (root->m_interval.getHigh() < max) {
+				root->m_max_high = max;
+			}
 		}
 	}
 
